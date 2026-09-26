@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ASIC Platform
 
 Personal ASIC design, verification, formal verification, and synthesis project.
@@ -11,3 +12,7 @@ Personal ASIC design, verification, formal verification, and synthesis project.
 - `synthesis/` — Synthesis scripts and constraints
 - `docs/` — Architecture and design documentation
 - `scripts/` — Build and utility scripts
+=======
+# cobalt
+soc
+>>>>>>> origin/main
