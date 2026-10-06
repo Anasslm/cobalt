@@ -4,9 +4,6 @@
 [submodule "rtl/third_party/axi2apb"]
 	path = rtl/third_party/axi2apb
 	url = https://github.com/pulp-platform/axi2apb.git
-[submodule "rtl/rtl/third_party/common_cells"]
-	path = rtl/rtl/third_party/common_cells
-	url = https://github.com/pulp-platform/common_cells.git
 [submodule "rtl/third_party/common_cells"]
 	path = rtl/third_party/common_cells
 	url = https://github.com/pulp-platform/common_cells.git
@@ -19,3 +16,9 @@
 [submodule "rtl/third_party/apb_uart"]
 	path = rtl/third_party/apb_uart
 	url = https://github.com/pulp-platform/apb_uart.git
+[submodule "axi"]
+	path = axi
+	url = https://github.com/pulp-platform/axi.git
+[submodule "rtl/third_party/axi"]
+	path = rtl/third_party/axi
+	url = https://github.com/pulp-platform/axi.git
