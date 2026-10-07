@@ -19,7 +19,7 @@ export CVA6_REPO_DIR="$PWD/rtl/third_party/cva6"
 export HPDCACHE_DIR="$CVA6_REPO_DIR/core/cache_subsystem/hpdcache"
 export TARGET_CFG="cv64a6_imafdc_sv39"
 
-export VERILATOR="/bin/verilator"
+export VERILATOR="$(command -v verilator)"
 
 "$VERILATOR" \
     --binary \
