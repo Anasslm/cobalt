@@ -14,7 +14,9 @@ localparam logic [7:0] TOHOST_CMD_EXIT    = 8'hFF;
 
   cobalt_soc  i_cobalt_soc (
     .clk_i(clk_i),
-    .rst_ni(rst_ni)
+    .rst_ni(rst_ni),
+    .tx_o(),
+    .rx_i(1'b0)
   );
 
 initial begin
@@ -96,8 +98,26 @@ always @(posedge clk_i) begin
           $display("EXIT CODE = %0d (0x%0h)",
                    val[15:0], val[15:0]);
           $display("=========================================");
-
-          $finish;
+        
+          if (val[15:0] == 16'h0000) begin
+            $display("██████╗  █████╗ ███████╗███████╗");
+            $display("██╔══██╗██╔══██╗██╔════╝██╔════╝");
+            $display("██████╔╝███████║███████╗███████╗");
+            $display("██╔═══╝ ██╔══██║╚════██║╚════██║");
+            $display("██║     ██║  ██║███████║███████║");
+            $display("╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝");
+            $display("RESULT = PASS");
+            $finish;
+          end else begin
+            $display("███████╗ █████╗ ██╗██╗     ");
+            $display("██╔════╝██╔══██╗██║██║     ");
+            $display("█████╗  ███████║██║██║     ");
+            $display("██╔══╝  ██╔══██║██║██║     ");
+            $display("██║     ██║  ██║██║███████╗"); 
+            $display("╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝");
+            $display("RESULT = FAIL");
+            $finish;
+          end
         end
 
 
