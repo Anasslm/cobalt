@@ -35,8 +35,25 @@ jobs:
             python3-pip \
             gcc-riscv64-unknown-elf \
             binutils-riscv64-unknown-elf
-      - name: Debug runner
-        uses: mxschmitt/action-tmate@v3      
+      - name: Debug Flex
+        run: |
+          echo "=== FLEX ==="
+          which flex
+          flex --version
+              
+          echo "=== FLEX PACKAGE FILES ==="
+          dpkg -L flex | grep FlexLexer.h || true
+              
+          echo "=== HEADER LOCATION ==="
+          find /usr -name FlexLexer.h 2>/dev/null || true
+              
+          echo "=== G++ INCLUDE TEST ==="
+          echo '#include <FlexLexer.h>' | g++ -x c++ -E -
+          
+          echo "=== G++ VERSION ==="
+          g++ --version
+            - name: Debug runner
+              uses: mxschmitt/action-tmate@v3      
       - name: Install Verilator 5.032
         run: |
           git clone --depth 1 --branch v5.032 \
