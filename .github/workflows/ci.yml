@@ -53,8 +53,8 @@ jobs:
           
           echo "=== G++ VERSION ==="
           g++ --version
-            - name: Debug runner
-              uses: mxschmitt/action-tmate@v3      
+#      - name: Debug runner
+#        uses: mxschmitt/action-tmate@v3      
       - name: Install Verilator 5.032
         run: |
           git clone --depth 1 --branch v5.032 \
