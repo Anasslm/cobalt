@@ -1,0 +1,42 @@
+name: Cobalt CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  simulation:
+    name: RTL Simulation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            verilator \
+            gcc \
+            g++ \
+            python3
+
+      - name: Show tool versions
+        run: |
+          git --version
+          python3 --version
+          verilator --version
+          gcc --version
+
+      - name: Run Cobalt simulation
+        run: |
+          chmod +x scripts/cobalt.py
+          python3 scripts/cobalt.py run
