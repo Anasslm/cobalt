@@ -16,9 +16,6 @@
 [submodule "rtl/third_party/apb_uart"]
 	path = rtl/third_party/apb_uart
 	url = https://github.com/pulp-platform/apb_uart.git
-[submodule "axi"]
-	path = axi
-	url = https://github.com/pulp-platform/axi.git
 [submodule "rtl/third_party/axi"]
 	path = rtl/third_party/axi
 	url = https://github.com/pulp-platform/axi.git
