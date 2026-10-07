@@ -24,12 +24,28 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            verilator \
+            git \
+            make \
+            autoconf \
+            flex \
+            bison \
             gcc \
             g++ \
             python3 \
+            python3-pip \
             gcc-riscv64-unknown-elf \
             binutils-riscv64-unknown-elf
+      - name: Install Verilator 5.032
+        run: |
+          git clone --depth 1 --branch v5.032 \
+            https://github.com/verilator/verilator.git \
+            verilator
+      
+          cd verilator
+          autoconf
+          ./configure
+          make -j$(nproc)
+          sudo make install
 
       - name: Show tool versions
         run: |
