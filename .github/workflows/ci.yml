@@ -35,12 +35,14 @@ jobs:
             python3-pip \
             gcc-riscv64-unknown-elf \
             binutils-riscv64-unknown-elf
+      - name: Debug runner
+        uses: mxschmitt/action-tmate@v3      
       - name: Install Verilator 5.032
         run: |
           git clone --depth 1 --branch v5.032 \
             https://github.com/verilator/verilator.git \
             verilator
-      
+
           cd verilator
           autoconf
           ./configure
