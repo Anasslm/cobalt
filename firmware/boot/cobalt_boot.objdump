@@ -1,0 +1,54 @@
+
+cobalt_boot.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000000000000 <_start>:
+   0:	0010029b          	addiw	t0,zero,1
+   4:	02fe                	slli	t0,t0,0x1f
+   6:	f1402573          	csrr	a0,mhartid
+   a:	8282                	jr	t0
+   c:	a001                	j	c <_start+0xc>
+
+Disassembly of section .riscv.attributes:
+
+0000000000000000 <.riscv.attributes>:
+   0:	6941                	lui	s2,0x10
+   2:	0000                	unimp
+   4:	7200                	ld	s0,32(a2)
+   6:	7369                	lui	t1,0xffffa
+   8:	01007663          	bgeu	zero,a6,14 <_start+0x14>
+   c:	005f 0000 7205      	.insn	6, 0x72050000005f
+  12:	3676                	fld	fa2,376(sp)
+  14:	6934                	ld	a3,80(a0)
+  16:	7032                	.insn	2, 0x7032
+  18:	5f31                	li	t5,-20
+  1a:	326d                	addiw	tp,tp,-5 # fffffffffffffffb <_start+0xfffffffffffffffb>
+  1c:	3070                	fld	fa2,224(s0)
+  1e:	615f 7032 5f31      	.insn	6, 0x5f317032615f
+  24:	3266                	fld	ft4,120(sp)
+  26:	3270                	fld	fa2,224(a2)
+  28:	645f 7032 5f32      	.insn	6, 0x5f327032645f
+  2e:	30703263          	.insn	4, 0x30703263
+  32:	7a5f 6369 7273      	.insn	6, 0x727363697a5f
+  38:	7032                	.insn	2, 0x7032
+  3a:	5f30                	lw	a2,120(a4)
+  3c:	6d7a                	ld	s10,408(sp)
+  3e:	756d                	lui	a0,0xffffb
+  40:	316c                	fld	fa1,224(a0)
+  42:	3070                	fld	fa2,224(s0)
+  44:	7a5f 6161 6f6d      	.insn	6, 0x6f6d61617a5f
+  4a:	7031                	c.lui	zero,0xfffec
+  4c:	5f30                	lw	a2,120(a4)
+  4e:	617a                	ld	sp,408(sp)
+  50:	726c                	ld	a1,224(a2)
+  52:	70316373          	csrrsi	t1,0x703,2
+  56:	5f30                	lw	a2,120(a4)
+  58:	637a                	ld	t1,408(sp)
+  5a:	3161                	addiw	sp,sp,-8
+  5c:	3070                	fld	fa2,224(s0)
+  5e:	7a5f 6463 7031      	.insn	6, 0x703164637a5f
+  64:	0030                	addi	a2,sp,8
+  66:	0108                	addi	a0,sp,128
+  68:	0b0a                	slli	s6,s6,0x2

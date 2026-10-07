@@ -1,0 +1,1 @@
+-F ${CVA6_REPO_DIR}/core/Flist.cva6
