@@ -67,8 +67,37 @@ def run_sim():
     print(" Running simulation")
     print("========================================")
 
-    run([str(sim)])
+    result = subprocess.run(
+        [str(sim)],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
 
+    # Show simulation output
+    print(result.stdout, end="")
+    print(result.stderr, end="")
+
+    # Check simulation process
+    if result.returncode != 0:
+        print()
+        print("========================================")
+        print(" SIMULATION PROCESS FAILED")
+        print(f" PROCESS EXIT CODE = {result.returncode}")
+        print("========================================")
+        sys.exit(result.returncode)
+
+    # Check Cobalt test result
+    if "RESULT = PASS" in result.stdout:
+        print("Simulation PASSED")
+        return
+
+    if "RESULT = FAIL" in result.stdout:
+        print("Simulation FAILED")
+        sys.exit(1)
+
+    print("ERROR: No simulation result detected.")
+    sys.exit(1)
 
 def clean():
     print("Cleaning generated files...")
