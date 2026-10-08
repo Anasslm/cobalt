@@ -1,0 +1,5 @@
+# Firmware build artifacts
+firmware/build
+
+# Generated simulation memory
+verif/tb/sram_program.mem
