@@ -2,6 +2,8 @@ ENTRY(_start)
 
 PROVIDE(tohost   = 0x80001000);
 PROVIDE(fromhost = 0x80001008);
+PROVIDE(__uart_base_addr__ = 0x10000000);
+
 
 MEMORY
 {
