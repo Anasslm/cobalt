@@ -50,6 +50,7 @@ if [[ "$IS_C_TEST" == true ]]; then
         -nodefaultlibs \
         -mcmodel=medany \
         "$COBALT_ROOT/firmware/lib/cobalt_printf.c" \
+        "$COBALT_ROOT/firmware/lib/uart.c" \
         -I"$COBALT_ROOT/firmware/include" \
         -T "$LINKER" \
         -o "$BUILD_DIR/${TEST}.elf" \
