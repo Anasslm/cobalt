@@ -11,3 +11,9 @@
 - `synthesis/` — Synthesis scripts and constraints
 - `docs/` — Architecture and design documentation
 - `scripts/` — Build and utility scripts
+
+
+
+
+
+
