@@ -17,6 +17,13 @@ package cobalt_pkg;
   localparam int unsigned NumSources = 30;
   localparam int unsigned MaxPriority = 7;
 
+  typedef bit [ 7:0] byte_bt; 
+  typedef bit [15:0] shrt_bt;
+  typedef bit [31:0] word_bt;
+  typedef bit [63:0] doub_bt;
+  typedef bit [ 9:0] dw_bt;   // data widths
+  typedef bit [ 5:0] aw_bt;   // address, ID widths or small buffers  
+
   localparam NrSlaves = 2; // actually masters, but slaves on the crossbar
 
   typedef enum int unsigned {
