@@ -1,5 +1,6 @@
 
 
+--timescale 1ns/1ps
 
 
 +define+TARGET_COMMON_CELLS
