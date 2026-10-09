@@ -1,29 +1,82 @@
 
 module cobalt_tb;
 
+
+  import cobalt_pkg::*;
+
   // Parameters
 
-localparam logic [31:0] TOHOST_MAGIC = 32'h434F4241; // "COBA"
+  localparam logic [31:0] TOHOST_MAGIC = 32'h434F4241; // "COBA"
 
-localparam logic [7:0] TOHOST_CMD_PUTCHAR = 8'h01;
-localparam logic [7:0] TOHOST_CMD_EXIT    = 8'hFF;
+  localparam logic [7:0] TOHOST_CMD_PUTCHAR = 8'h01;
+  localparam logic [7:0] TOHOST_CMD_EXIT    = 8'hFF;
+
+  // UART configuration: matching the firmware ( params.h ).
+
+  parameter int unsigned  UartBaudRate      = 115200;
+  parameter int unsigned  UartParityEna     = 0;
+  parameter int unsigned  UartBurstBytes    = 256;
+  parameter int unsigned  UartWaitCycles    = 60;
+
+  // UART VIP tasks and monitor
+  `include "uart_vip.svh"
+
+
+
+  task wait_for_reset;
+    @(posedge rst_ni);
+    @(posedge clk_i);
+  endtask
+
 
   //Ports
   reg clk_i;
   reg rst_ni;
 
+  logic uart_tx;
+  logic uart_rx;
+
+task automatic uart_check_message;
+    byte_bt received;
+    string expected = "KA\r\n";
+    int errors = 0;
+
+    for (int i = 0; i < expected.len(); i++) begin
+        uart_read_byte(received);
+
+        if (received !== expected[i]) begin
+            $error(
+                "[UART TEST] Byte %0d: expected 0x%02h, received 0x%02h",
+                i, expected[i], received
+            );
+            errors++;
+        end
+    end
+
+    if (errors == 0)
+        $display("[UART TEST] PASS: message received correctly");
+    else
+        $error("[UART TEST] FAIL: %0d mismatched bytes", errors);
+endtask
+
+
   cobalt_soc  i_cobalt_soc (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
-    .tx_o(),
-    .rx_i(1'b0)
+    .tx_o(uart_tx),
+    .rx_i(uart_rx)
   );
+
+initial uart_rx = 1'b1; // UART idle level
 
 initial begin
     $display("COBALT TB");
     clk_i = 1'b0;
     forever #5 clk_i = ~clk_i;
 end
+
+
+byte_bt received;
 
 initial begin
     rst_ni = 1'b0;
@@ -32,8 +85,18 @@ initial begin
     rst_ni = 1'b1;
     repeat (1000) @(posedge clk_i);
 
+  //  uart_check_message();
+
+    
+
+    uart_read_byte(received);
+
+    uart_write_byte(received); // Send newline 
+
+    
+
     // timeout
-    repeat (10000) @(posedge clk_i);
+    repeat (10000000) @(posedge clk_i);
     $display("*** TIMEOUT: no tohost write seen ***");
     $finish;
 
@@ -84,6 +147,7 @@ always @(posedge clk_i) begin
           $write("%c", val[7:0]);
 
           if (val[7:0] == 8'h0A)
+  //          $display("[TOHOST] Line completed at %0t", $time);
             $fflush();
         end
 
