@@ -29,5 +29,6 @@ export VERILATOR="$(command -v verilator)"
     -Wno-BLKANDNBLK \
     --top-module cobalt_tb \
     -f filelists/rtl.f \
+    -f filelists/testbench.f \
     verif/tb/cobalt_tb.sv
 
