@@ -8,9 +8,40 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+TB_TEST_DIR = ROOT / "verif" / "tb" / "tests"
+TB_SELECTOR = ROOT / "verif" / "tb" / "selected_test.svh"
+DEFAULT_TB_TEST = "cobalt_smoke_test.svh"
+
 BOOT_DIR = ROOT / "firmware" / "boot"
 SW_BUILD = ROOT / "scripts" / "sw" / "build.sh"
 SIM_BUILD = ROOT / "scripts" / "compile.sh"
+
+def select_testbench(test):
+    # Prefer a testbench scenario matching the firmware test name
+    scenario = TB_TEST_DIR / f"{test}.svh"
+
+    if scenario.is_file():
+        selected = scenario
+        print(f"Selected testbench scenario: {scenario.name}")
+    else:
+        selected = TB_TEST_DIR / DEFAULT_TB_TEST
+        print(
+            f"No testbench scenario found for '{test}'; "
+            f"using default: {DEFAULT_TB_TEST}"
+        )
+
+    if not selected.is_file():
+        raise SystemExit(
+            f"ERROR: Default testbench scenario not found: {selected}"
+        )
+
+    content = f'`include "tests/{selected.name}"\n'
+
+    if not TB_SELECTOR.exists() or TB_SELECTOR.read_text() != content:
+        TB_SELECTOR.write_text(content, encoding="utf-8")
+        print(f"Updated test selector: {TB_SELECTOR.name}")
+    else:
+        print(f"Test selector unchanged: {TB_SELECTOR.name}")
 
 
 def run(cmd, cwd=None):
@@ -67,32 +98,41 @@ def run_sim():
     print(" Running simulation")
     print("========================================")
 
-    result = subprocess.run(
+    # Stream output live while also capturing it for PASS/FAIL detection.
+    result = subprocess.Popen(
         [str(sim)],
         cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
-        capture_output=True,
+        bufsize=1,
     )
 
-    # Show simulation output
-    print(result.stdout, end="")
-    print(result.stderr, end="")
+    output = []
 
-    # Check simulation process
-    if result.returncode != 0:
+    try:
+        for line in result.stdout:
+            print(line, end="", flush=True)
+            output.append(line)
+    finally:
+        result.stdout.close()
+
+    return_code = result.wait()
+    simulation_output = "".join(output)
+
+    if return_code != 0:
         print()
         print("========================================")
         print(" SIMULATION PROCESS FAILED")
-        print(f" PROCESS EXIT CODE = {result.returncode}")
+        print(f" PROCESS EXIT CODE = {return_code}")
         print("========================================")
-        sys.exit(result.returncode)
+        sys.exit(return_code)
 
-    # Check Cobalt test result
-    if "RESULT = PASS" in result.stdout:
+    if "RESULT = PASS" in simulation_output:
         print("Simulation PASSED")
         return
 
-    if "RESULT = FAIL" in result.stdout:
+    if "RESULT = FAIL" in simulation_output:
         print("Simulation FAILED")
         sys.exit(1)
 
@@ -164,6 +204,7 @@ def main():
     elif args.command == "run":
         build_bootrom()
         build_firmware(args.test)
+        select_testbench(args.test)
         build_sim()
         run_sim()
 

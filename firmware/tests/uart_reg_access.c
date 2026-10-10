@@ -41,7 +41,7 @@ int main(void)
         received = uart_read(uart);
     
         if (received != msg[i]) {
-            cobalt_printf("UART RX FAIL at byte %u: expected 0x%x, got 0x%x\n",
+            cobalt_printf("UART RX FAIL at byte %u: expected %c, got %c\n",
                           i, msg[i], received);
             cobalt_exit(0);
         }
