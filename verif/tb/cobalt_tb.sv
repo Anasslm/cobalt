@@ -36,28 +36,6 @@ module cobalt_tb;
   logic uart_tx;
   logic uart_rx;
 
-task automatic uart_check_message;
-    byte_bt received;
-    string expected = "KA\r\n";
-    int errors = 0;
-
-    for (int i = 0; i < expected.len(); i++) begin
-        uart_read_byte(received);
-
-        if (received !== expected[i]) begin
-            $error(
-                "[UART TEST] Byte %0d: expected 0x%02h, received 0x%02h",
-                i, expected[i], received
-            );
-            errors++;
-        end
-    end
-
-    if (errors == 0)
-        $display("[UART TEST] PASS: message received correctly");
-    else
-        $error("[UART TEST] FAIL: %0d mismatched bytes", errors);
-endtask
 
 
   cobalt_soc  i_cobalt_soc (
@@ -66,6 +44,8 @@ endtask
     .tx_o(uart_tx),
     .rx_i(uart_rx)
   );
+
+`include "selected_test.svh"
 
 initial uart_rx = 1'b1; // UART idle level
 
@@ -76,35 +56,25 @@ initial begin
 end
 
 
-byte_bt received;
 
-initial begin
+initial begin : reset_and_memory_init
     rst_ni = 1'b0;
-    $readmemh("verif/tb/sram_program.mem", i_cobalt_soc.i_tc_sram.sram);
+
+    // preload the SRAM with the program to run
+    $display("[%0t] Preloading SRAM with program", $time);
+    $readmemh(
+        "verif/tb/sram_program.mem",
+        i_cobalt_soc.i_tc_sram.sram
+    );
+
     repeat (10) @(posedge clk_i);
     rst_ni = 1'b1;
-    repeat (1000) @(posedge clk_i);
 
-  //  uart_check_message();
-
-    
-
-    uart_read_byte(received);
-
-    uart_write_byte(received); // Send newline 
-
-    
-
-    // timeout
+    // Watchdog for the test.
     repeat (10000000) @(posedge clk_i);
+
     $display("*** TIMEOUT: no tohost write seen ***");
-    $finish;
-
-end
-
-initial begin    
-    $dumpfile("cobalt.vcd");
-    $dumpvars(0, cobalt_tb);
+    $finish;    
 end
 
 
