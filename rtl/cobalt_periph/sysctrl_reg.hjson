@@ -1,0 +1,61 @@
+{
+  "name": "SYSCTRL",
+  "regwidth": "32",
+  "clock_primary": "clk_i",
+  "reset_primary": "rst_ni",
+  "bus_interfaces": [
+    {
+      "protocol": "reg_iface",
+      "direction": "device"
+    }
+  ],
+  "registers": [
+    {
+      "name": "CHIPID",
+      "desc": "Chip Identification register",
+      "swaccess": "ro",
+      "resval": "0",
+      "fields": [
+        {
+          "bits": "31:0",
+          "name": "CHIPID",
+          "desc": "Chip Identification"
+        }
+      ]
+    },
+    {
+      "name": "SPARE",
+      "desc": "spare register for debug",
+      "swaccess": "rw",
+      "resval": "0",
+      "fields": [
+        {
+          "bits": "31:0",
+          "name": "SPARE",
+          "desc": "",
+          "swaccess": "rw"
+        }
+      ]
+    },
+    {
+      "name": "REG_1",
+      "desc": "register 1",
+      "swaccess": "rw",
+      "resval": "0",
+      "fields": [
+        {
+          "bits": "15:0",
+          "name": "reg00",
+          "desc": "",
+          "swaccess": "rw"
+        },
+        {
+          "bits": "31:16",
+          "name": "reg01",
+          "desc": "reg01",
+          "swaccess": "rw"
+        }
+      ]
+    }
+  ]
+}
