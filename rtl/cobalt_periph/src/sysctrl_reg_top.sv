@@ -68,15 +68,9 @@ module sysctrl_reg_top #(
   // Format: <reg>_<field>_{wd|we|qs}
   //        or <reg>_{wd|we|qs} if field == 1 or 0
   logic [31:0] chipid_qs;
-  logic [31:0] spare_qs;
-  logic [31:0] spare_wd;
-  logic spare_we;
-  logic [15:0] reg_1_reg00_qs;
-  logic [15:0] reg_1_reg00_wd;
-  logic reg_1_reg00_we;
-  logic [15:0] reg_1_reg01_qs;
-  logic [15:0] reg_1_reg01_wd;
-  logic reg_1_reg01_we;
+  logic [31:0] tohost_wd;
+  logic tohost_we;
+  logic [31:0] fromhost_qs;
 
   // Register instances
   // R[chipid]: V(False)
@@ -105,19 +99,19 @@ module sysctrl_reg_top #(
   );
 
 
-  // R[spare]: V(False)
+  // R[tohost]: V(False)
 
   prim_subreg #(
     .DW      (32),
-    .SWACCESS("RW"),
+    .SWACCESS("WO"),
     .RESVAL  (32'h0)
-  ) u_spare (
+  ) u_tohost (
     .clk_i   (clk_i    ),
     .rst_ni  (rst_ni  ),
 
     // from register interface
-    .we     (spare_we),
-    .wd     (spare_wd),
+    .we     (tohost_we),
+    .wd     (tohost_wd),
 
     // from internal hardware
     .de     (1'b0),
@@ -125,27 +119,24 @@ module sysctrl_reg_top #(
 
     // to internal hardware
     .qe     (),
-    .q      (reg2hw.spare.q ),
+    .q      (reg2hw.tohost.q ),
 
-    // to register interface (read)
-    .qs     (spare_qs)
+    .qs     ()
   );
 
 
-  // R[reg_1]: V(False)
+  // R[fromhost]: V(False)
 
-  //   F[reg00]: 15:0
   prim_subreg #(
-    .DW      (16),
-    .SWACCESS("RW"),
-    .RESVAL  (16'h0)
-  ) u_reg_1_reg00 (
+    .DW      (32),
+    .SWACCESS("RO"),
+    .RESVAL  (32'h0)
+  ) u_fromhost (
     .clk_i   (clk_i    ),
     .rst_ni  (rst_ni  ),
 
-    // from register interface
-    .we     (reg_1_reg00_we),
-    .wd     (reg_1_reg00_wd),
+    .we     (1'b0),
+    .wd     ('0  ),
 
     // from internal hardware
     .de     (1'b0),
@@ -153,36 +144,10 @@ module sysctrl_reg_top #(
 
     // to internal hardware
     .qe     (),
-    .q      (reg2hw.reg_1.reg00.q ),
+    .q      (reg2hw.fromhost.q ),
 
     // to register interface (read)
-    .qs     (reg_1_reg00_qs)
-  );
-
-
-  //   F[reg01]: 31:16
-  prim_subreg #(
-    .DW      (16),
-    .SWACCESS("RW"),
-    .RESVAL  (16'h0)
-  ) u_reg_1_reg01 (
-    .clk_i   (clk_i    ),
-    .rst_ni  (rst_ni  ),
-
-    // from register interface
-    .we     (reg_1_reg01_we),
-    .wd     (reg_1_reg01_wd),
-
-    // from internal hardware
-    .de     (1'b0),
-    .d      ('0  ),
-
-    // to internal hardware
-    .qe     (),
-    .q      (reg2hw.reg_1.reg01.q ),
-
-    // to register interface (read)
-    .qs     (reg_1_reg01_qs)
+    .qs     (fromhost_qs)
   );
 
 
@@ -192,8 +157,8 @@ module sysctrl_reg_top #(
   always_comb begin
     addr_hit = '0;
     addr_hit[0] = (reg_addr == SYSCTRL_CHIPID_OFFSET);
-    addr_hit[1] = (reg_addr == SYSCTRL_SPARE_OFFSET);
-    addr_hit[2] = (reg_addr == SYSCTRL_REG_1_OFFSET);
+    addr_hit[1] = (reg_addr == SYSCTRL_TOHOST_OFFSET);
+    addr_hit[2] = (reg_addr == SYSCTRL_FROMHOST_OFFSET);
   end
 
   assign addrmiss = (reg_re || reg_we) ? ~|addr_hit : 1'b0 ;
@@ -206,14 +171,8 @@ module sysctrl_reg_top #(
                (addr_hit[2] & (|(SYSCTRL_PERMIT[2] & ~reg_be)))));
   end
 
-  assign spare_we = addr_hit[1] & reg_we & !reg_error;
-  assign spare_wd = reg_wdata[31:0];
-
-  assign reg_1_reg00_we = addr_hit[2] & reg_we & !reg_error;
-  assign reg_1_reg00_wd = reg_wdata[15:0];
-
-  assign reg_1_reg01_we = addr_hit[2] & reg_we & !reg_error;
-  assign reg_1_reg01_wd = reg_wdata[31:16];
+  assign tohost_we = addr_hit[1] & reg_we & !reg_error;
+  assign tohost_wd = reg_wdata[31:0];
 
   // Read data return
   always_comb begin
@@ -224,12 +183,11 @@ module sysctrl_reg_top #(
       end
 
       addr_hit[1]: begin
-        reg_rdata_next[31:0] = spare_qs;
+        reg_rdata_next[31:0] = '0;
       end
 
       addr_hit[2]: begin
-        reg_rdata_next[15:0] = reg_1_reg00_qs;
-        reg_rdata_next[31:16] = reg_1_reg01_qs;
+        reg_rdata_next[31:0] = fromhost_qs;
       end
 
       default: begin

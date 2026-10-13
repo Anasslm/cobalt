@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
+import html
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 import hjson
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QDialog, QFileDialog,
     QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter, QTreeWidget,
@@ -270,6 +273,16 @@ class RegGenWindow(QMainWindow):
         export_doc_action = self.export_menu.addAction("Export DOC")
         export_ral_action = self.export_menu.addAction("Export RAL")
 
+
+        self.export_actions = [
+            export_rtl_action,
+            export_doc_action,
+            export_ral_action,
+        ]
+
+        for action in self.export_actions:
+            action.setEnabled(False)
+
         export_rtl_action.triggered.connect(
             lambda: self.export_block("RTL")
         )
@@ -431,8 +444,13 @@ class RegGenWindow(QMainWindow):
         ]:
             widget.setEnabled(enabled)
 
-    def log_message(self, message):
-        self.log.append(message)
+    def log_message(self, message, color=None):
+        if color:
+            self.log.append(
+                f'<span style="color: {color};">{message}</span>'
+            )
+        else:
+            self.log.append(message)
 
     def confirm_discard(self):
         if not self.dirty:
@@ -582,6 +600,8 @@ class RegGenWindow(QMainWindow):
         self.mark_dirty()
 
     def mark_dirty(self):
+        for action in getattr(self, "export_actions", []):
+            action.setEnabled(False)        
         self.dirty = True
         self.update_preview()
         if self.current_file:
@@ -835,28 +855,308 @@ class RegGenWindow(QMainWindow):
         self.log_message(f"Removed: {description}")
     def check_block(self):
         if not self.data:
-            self.log_message("CHECK: No register block loaded.")
+            self.log_message("CHECK FAILED: No register block loaded.", color="red")
             return
+
+        if not self.current_file:
+            self.log_message("CHECK FAILED: No HJSON file is associated with this block.", color="red")
+            return
+
+        # Save the current GUI contents before checking the file.
+        if not self.save_hjson():
+            self.log_message("CHECK FAILED: Could not save the current HJSON.", color="red")
+            return
+
+        hjson_file = self.current_file.resolve()
+
+        # Resolve paths relative to registrator.py, regardless of the launch directory.
+        repo_root = Path(__file__).resolve().parents[3]
+        regtool = repo_root / "rtl" / "cobalt_periph" / "tools" / "util" / "reggen" / "regtool.py"
+
+        # Invalidate any previous successful check.
+        for action in self.export_actions:
+            action.setEnabled(False)
+
+        if not regtool.is_file():
+            self.log_message(f"CHECK FAILED: regtool.py not found: {regtool}", color="red")
+            return
+
+        command = [
+            sys.executable,
+            str(regtool),
+            "-v",
+            str(hjson_file),
+        ]
+
+        self.log_message("")
+        self.log_message("========== CHECK STARTED ==========")
+        self.log_message(f"File: {hjson_file}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+            # regtool's verbose output, including the printed HJSON.
+            if result.stdout.strip():
+                self.log_message(result.stdout.rstrip())
+
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+            #    self.log_message(
+            #        f"CHECK FAILED: regtool.py exited with code "
+            #        f"{result.returncode}."
+            #    )
+                self.log_message(
+                    f"CHECK FAILED: regtool.py exited with code "
+                    f"{result.returncode}.",
+                    color="red"
+                )
+                return
+
+            self.log_message(
+                "CHECK PASSED: HJSON validation succeeded.",
+                color="green"
+            )
+            for action in self.export_actions:
+                action.setEnabled(True)
+
+            self.statusBar().showMessage("Check passed — export enabled")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                f"CHECK FAILED: regtool.py timed out after 60 seconds.",
+                color="red"
+            )
+
+        except OSError as error:
+            self.log_message(f"CHECK FAILED: Could not execute regtool.py: {error}", color="red")
+
 
         self.log_message(
             f"CHECK: Requested validation for '{self.data.get('name', 'Unnamed')}'."
         )
-        self.log_message("CHECK: Command execution not implemented yet.")
 
     def export_block(self, export_type):
         if not self.data:
             self.log_message(
-                f"EXPORT {export_type}: No register block loaded."
+                f"EXPORT {export_type} FAILED: No register block loaded.",
+                color="red",
             )
             return
 
-        self.log_message(
-            f"EXPORT {export_type}: Requested export for "
-            f"'{self.data.get('name', 'Unnamed')}'."
+        if export_type == "DOC":
+            self.export_doc()
+            return
+
+        if export_type != "RTL":
+            self.log_message(f"EXPORT {export_type}: Command execution not implemented yet.")
+            return
+
+        if not self.current_file or not self.current_file.is_file():
+            self.log_message(
+                "EXPORT RTL FAILED: No saved HJSON file is associated with this block.",
+                color="red",
+            )
+            return
+
+        if self.dirty:
+            self.log_message(
+                "EXPORT RTL FAILED: Save and check the HJSON before exporting.",
+                color="red",
+            )
+            return
+
+        output_directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select RTL output directory",
+            str(self.current_file.parent),
         )
-        self.log_message(
-            f"EXPORT {export_type}: Command execution not implemented yet."
+        if not output_directory:
+            return
+
+        repo_root = Path(__file__).resolve().parents[3]
+        regtool = (
+            repo_root / "rtl" / "cobalt_periph" / "tools" / "util"
+            / "reggen" / "regtool.py"
         )
+        if not regtool.is_file():
+            self.log_message(
+                f"EXPORT RTL FAILED: regtool.py not found: {regtool}",
+                color="red",
+            )
+            return
+
+        output_path = Path(output_directory).resolve()
+        command = [
+            sys.executable,
+            str(regtool),
+            "-r",
+            "-t",
+            str(output_path),
+            str(self.current_file.resolve()),
+        ]
+
+        self.log_message("========== RTL EXPORT STARTED ==========")
+        self.log_message(f"HJSON: {self.current_file.resolve()}")
+        self.log_message(f"Output directory: {output_path}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+            if result.stdout.strip():
+                self.log_message(result.stdout.rstrip())
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+                self.log_message(
+                    f"EXPORT RTL FAILED: regtool.py exited with code {result.returncode}.",
+                    color="red",
+                )
+                return
+
+            self.log_message(
+                f"EXPORT SUCCESSFUL: RTL saved to {html.escape(str(output_path))}",
+                color="green",
+            )
+            self.statusBar().showMessage(f"RTL export successful: {output_path}")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                "EXPORT RTL FAILED: regtool.py timed out after 60 seconds.",
+                color="red",
+            )
+        except OSError as error:
+            self.log_message(
+                f"EXPORT RTL FAILED: Could not execute regtool.py: {error}",
+                color="red",
+            )
+
+    def export_doc(self):
+        if not self.current_file or not self.current_file.is_file():
+            self.log_message(
+                "EXPORT DOC FAILED: No saved HJSON file is associated with this block.",
+                color="red",
+            )
+            return
+
+        if self.dirty:
+            self.log_message(
+                "EXPORT DOC FAILED: Save and check the HJSON before exporting.",
+                color="red",
+            )
+            return
+
+        default_name = text_value(
+            self.data.get("name"), self.current_file.stem
+        ).strip() or self.current_file.stem
+        suggested_path = self.current_file.parent / f"{default_name}.html"
+        output_filename, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save register documentation",
+            str(suggested_path),
+            "HTML files (*.html);;Markdown files (*.md)",
+        )
+        if not output_filename:
+            return
+        is_markdown = selected_filter.startswith("Markdown")
+        extension = ".md" if is_markdown else ".html"
+
+        repo_root = Path(__file__).resolve().parents[3]
+        regtool = (
+            repo_root / "rtl" / "cobalt_periph" / "tools" / "util"
+            / "reggen" / "regtool.py"
+        )
+        if not regtool.is_file():
+            self.log_message(
+                f"EXPORT DOC FAILED: regtool.py not found: {regtool}",
+                color="red",
+            )
+            return
+
+        output_path = Path(output_filename).expanduser().resolve()
+        output_path = output_path.with_suffix(extension)
+        command = [
+            sys.executable,
+            str(regtool),
+            "-d",
+            str(self.current_file.resolve()),
+        ]
+
+        self.log_message("========== DOC EXPORT STARTED ==========")
+        self.log_message(f"HJSON: {self.current_file.resolve()}")
+        self.log_message(f"Output file: {output_path}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=60,
+                check=False,
+            )
+
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+                self.log_message(
+                    f"EXPORT DOC FAILED: regtool.py exited with code {result.returncode}.",
+                    color="red",
+                )
+                return
+
+            if is_markdown:
+                document = QTextDocument()
+                document.setHtml(result.stdout)
+                output_content = document.toMarkdown()
+            else:
+                output_content = result.stdout
+
+            if not output_content.strip():
+                self.log_message(
+                    "EXPORT DOC FAILED: regtool.py produced empty documentation.",
+                    color="red",
+                )
+                return
+
+            output_path.write_text(output_content, encoding="utf-8")
+            self.log_message(
+                f"EXPORT SUCCESSFUL: DOC saved to {html.escape(str(output_path))}",
+                color="green",
+            )
+            self.statusBar().showMessage(f"DOC export successful: {output_path}")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                "EXPORT DOC FAILED: regtool.py timed out after 60 seconds.",
+                color="red",
+            )
+        except OSError as error:
+            self.log_message(
+                f"EXPORT DOC FAILED: Could not generate/write documentation: {error}",
+                color="red",
+            )
 
     def save_hjson(self):
         if not self.data:
