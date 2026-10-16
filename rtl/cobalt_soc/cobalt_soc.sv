@@ -17,7 +17,7 @@ localparam AxiIdWidthMaster = cobalt_axi::IdWidth;
 localparam AxiIdWidthSlave  = cobalt_axi::IdWidth + $clog2(cobalt_pkg::NrSlaves);
 localparam AxiUserWidth     = cobalt_axi::UserWidth;
 localparam xbar_NrSlaves    = cobalt_pkg::NrSlaves;
-localparam xbar_NrMasters   = cobalt_pkg::NB_PERIPHERALS;
+localparam xbar_NrMasters   = cobalt_pkg::NB_AXI_PERIPHERALS;
 
 
 
@@ -61,25 +61,32 @@ cpu_subsys  i_cpu_subsys (
 // AXI Xbar
 // ---------------
 
-axi_pkg::xbar_rule_64_t [cobalt_pkg::NB_PERIPHERALS-1:0] addr_map;
+axi_pkg::xbar_rule_64_t [cobalt_pkg::NB_AXI_PERIPHERALS-1:0] addr_map;
+
+// assign addr_map = '{
+  // '{ idx: cobalt_pkg::Debug,    start_addr: cobalt_pkg::DebugBase,    end_addr: cobalt_pkg::DebugBase + cobalt_pkg::DebugLength       },
+  // '{ idx: cobalt_pkg::ROM,      start_addr: cobalt_pkg::ROMBase,      end_addr: cobalt_pkg::ROMBase + cobalt_pkg::ROMLength           },
+  // '{ idx: cobalt_pkg::CLINT,    start_addr: cobalt_pkg::CLINTBase,    end_addr: cobalt_pkg::CLINTBase + cobalt_pkg::CLINTLength       },
+  // '{ idx: cobalt_pkg::PLIC,     start_addr: cobalt_pkg::PLICBase,     end_addr: cobalt_pkg::PLICBase + cobalt_pkg::PLICLength         },
+  // '{ idx: cobalt_pkg::UART,     start_addr: cobalt_pkg::UARTBase,     end_addr: cobalt_pkg::UARTBase + cobalt_pkg::UARTLength         },
+  // '{ idx: cobalt_pkg::Timer,    start_addr: cobalt_pkg::TimerBase,    end_addr: cobalt_pkg::TimerBase + cobalt_pkg::TimerLength       },
+  // '{ idx: cobalt_pkg::SPI,      start_addr: cobalt_pkg::SPIBase,      end_addr: cobalt_pkg::SPIBase + cobalt_pkg::SPILength           },
+  // '{ idx: cobalt_pkg::Ethernet, start_addr: cobalt_pkg::EthernetBase, end_addr: cobalt_pkg::EthernetBase + cobalt_pkg::EthernetLength },
+  // '{ idx: cobalt_pkg::GPIO,     start_addr: cobalt_pkg::GPIOBase,     end_addr: cobalt_pkg::GPIOBase + cobalt_pkg::GPIOLength         },
+  // '{ idx: cobalt_pkg::SRAM,     start_addr: cobalt_pkg::SramBase,     end_addr: cobalt_pkg::SramBase + cobalt_pkg::SRAMLength         }
+// };
 
 assign addr_map = '{
   '{ idx: cobalt_pkg::Debug,    start_addr: cobalt_pkg::DebugBase,    end_addr: cobalt_pkg::DebugBase + cobalt_pkg::DebugLength       },
   '{ idx: cobalt_pkg::ROM,      start_addr: cobalt_pkg::ROMBase,      end_addr: cobalt_pkg::ROMBase + cobalt_pkg::ROMLength           },
-  '{ idx: cobalt_pkg::CLINT,    start_addr: cobalt_pkg::CLINTBase,    end_addr: cobalt_pkg::CLINTBase + cobalt_pkg::CLINTLength       },
-  '{ idx: cobalt_pkg::PLIC,     start_addr: cobalt_pkg::PLICBase,     end_addr: cobalt_pkg::PLICBase + cobalt_pkg::PLICLength         },
-  '{ idx: cobalt_pkg::UART,     start_addr: cobalt_pkg::UARTBase,     end_addr: cobalt_pkg::UARTBase + cobalt_pkg::UARTLength         },
-  '{ idx: cobalt_pkg::Timer,    start_addr: cobalt_pkg::TimerBase,    end_addr: cobalt_pkg::TimerBase + cobalt_pkg::TimerLength       },
-  '{ idx: cobalt_pkg::SPI,      start_addr: cobalt_pkg::SPIBase,      end_addr: cobalt_pkg::SPIBase + cobalt_pkg::SPILength           },
-  '{ idx: cobalt_pkg::Ethernet, start_addr: cobalt_pkg::EthernetBase, end_addr: cobalt_pkg::EthernetBase + cobalt_pkg::EthernetLength },
-  '{ idx: cobalt_pkg::GPIO,     start_addr: cobalt_pkg::GPIOBase,     end_addr: cobalt_pkg::GPIOBase + cobalt_pkg::GPIOLength         },
+  '{ idx: cobalt_pkg::PERIPH,   start_addr: cobalt_pkg::PeriphBase,   end_addr: cobalt_pkg::PeriphBase + cobalt_pkg::PeriphLength     },
   '{ idx: cobalt_pkg::SRAM,     start_addr: cobalt_pkg::SramBase,     end_addr: cobalt_pkg::SramBase + cobalt_pkg::SRAMLength         }
 };
 
 
 localparam axi_pkg::xbar_cfg_t AXI_XBAR_CFG = '{
   NoSlvPorts:         cobalt_pkg::NrSlaves,
-  NoMstPorts:         cobalt_pkg::NB_PERIPHERALS,
+  NoMstPorts:         cobalt_pkg::NB_AXI_PERIPHERALS,
   MaxMstTrans:        1, // Probably requires update
   MaxSlvTrans:        1, // Probably requires update
   FallThrough:        1'b0,
@@ -90,7 +97,7 @@ localparam axi_pkg::xbar_cfg_t AXI_XBAR_CFG = '{
   PipelineStages:     1'b0,
   AxiAddrWidth:       cobalt_axi::AddrWidth,
   AxiDataWidth:       cobalt_axi::DataWidth,
-  NoAddrRules:        cobalt_pkg::NB_PERIPHERALS
+  NoAddrRules:        cobalt_pkg::NB_AXI_PERIPHERALS
 };
 
 
@@ -225,79 +232,19 @@ tc_sram # (
     .rdata_o(sram_rdata)
   );
 
-///---------------
-
-// ---------------
-// UART
-// ---------------
-logic         uart_penable;
-logic         uart_pwrite;
-logic [31:0]  uart_paddr;
-logic         uart_psel;
-logic [31:0]  uart_pwdata;
-logic [31:0]  uart_prdata;
-logic         uart_pready;
-logic         uart_pslverr;  
-
-typedef logic [31:0]  paddr_t;
-typedef logic [31:0]  pdata_t;
-typedef logic [3:0]   pstrb_t;
-
-// define types for slaves and masters of the xbar
-`APB_TYPEDEF_ALL(apb, paddr_t, pdata_t, pstrb_t)
-
-apb_req_t  uart_apb_req;
-apb_resp_t uart_apb_rsp;
-
-axi_to_apb # (
-    .NoRules(0),
-    .AxiAddrWidth(64),
-    .AxiDataWidth(64),
-    .AxiIdWidth($bits(slaves_id_t)  + $clog2(cobalt_pkg::NrSlaves)),
-    .AxiUserWidth(64),
-    .ApbAddrWidth(32),
-    .ApbDataWidth(32),
-    .axi_req_t(xbar_masters_req_t),
-    .axi_resp_t(xbar_masters_resp_t),
-    .apb_req_t(apb_req_t),
-    .apb_resp_t(apb_resp_t)
-  )
-  i_axi_to_apb (
+periph_subsys #(
+  .axi_req_t (xbar_masters_req_t),
+  .axi_resp_t (xbar_masters_resp_t),
+  .AxiIdWidth ($bits(slaves_id_t)  + $clog2(cobalt_pkg::NrSlaves))
+)
+i_periph_subsys (
     .clk_i(clk_i),
     .rst_ni(rst_ni),
-    .axi_req_i(xbar_masters_req[cobalt_pkg::UART]),
-    .axi_resp_o(xbar_masters_rsp[cobalt_pkg::UART]),
-    .apb_req_o (uart_apb_req),
-    .apb_resp_i(uart_apb_rsp),
-    .addr_map_i(0)
+    .axi_req_i(xbar_masters_req[cobalt_pkg::PERIPH]),
+    .axi_resp_o(xbar_masters_rsp[cobalt_pkg::PERIPH]),
+    .rx_i(rx_i),
+    .tx_o(tx_o)
   );
-
-
-
-apb_uart i_apb_uart (
-    .CLK     ( clk_i           ),
-    .RSTN    ( rst_ni          ),
-    .PSEL    ( uart_apb_req.psel       ),
-    .PENABLE ( uart_apb_req.penable    ),
-    .PWRITE  ( uart_apb_req.pwrite     ),
-    .PADDR   ( uart_apb_req.paddr[4:2] ),
-    .PWDATA  ( uart_apb_req.pwdata     ),
-    .PRDATA  ( uart_apb_rsp.prdata     ),
-    .PREADY  ( uart_apb_rsp.pready     ),
-    .PSLVERR ( uart_apb_rsp.pslverr    ),
-    .INT     (                 ), // to be connected to PLIC later on 
-    .OUT1N   (                 ), // keep open
-    .OUT2N   (                 ), // keep open
-    .RTSN    (                 ), // no flow control
-    .DTRN    (                 ), // no flow control
-    .CTSN    ( 1'b0            ),
-    .DSRN    ( 1'b0            ),
-    .DCDN    ( 1'b0            ),
-    .RIN     ( 1'b0            ),
-    .SIN     ( rx_i            ),
-    .SOUT    ( tx_o            )
-);
-
 
 
 endmodule
