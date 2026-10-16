@@ -11,9 +11,11 @@ int main(void)
     cobalt_printf("Character: %c\n", 'A');
     cobalt_printf("String: %s\n", "hello there");
 
-    volatile uint32_t *dma_base = (volatile uint32_t *) 0x10000000;
+    volatile uint64_t *sysctrl_chipid = (volatile uint64_t *)0x04000000;
+    volatile uint64_t *sysctrl_tohost = (volatile uint64_t *)0x04000004;
+    volatile uint64_t *sysctrl_fromhost = (volatile uint64_t *)0x04000008;
 
-    *dma_base = 0xdeadbeed;
+    cobalt_printf("sysctrl_chipid : %x\n", *sysctrl_chipid);
     
     cobalt_exit(0);
 

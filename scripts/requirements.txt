@@ -1,0 +1,5 @@
+hjson
+Mako
+PySide6
+PyYAML
+setuptools<81

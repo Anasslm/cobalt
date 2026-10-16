@@ -23,7 +23,7 @@ export VERILATOR="$(command -v verilator)"
 
 "$VERILATOR" \
     --binary \
-    --trace \
+    --trace-fst \
     --Wno-fatal \
      --trace-structs \
     -Wno-BLKANDNBLK \
@@ -31,4 +31,3 @@ export VERILATOR="$(command -v verilator)"
     -f filelists/rtl.f \
     -f filelists/testbench.f \
     verif/tb/cobalt_tb.sv
-

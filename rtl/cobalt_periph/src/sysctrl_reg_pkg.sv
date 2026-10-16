@@ -15,45 +15,46 @@ package sysctrl_reg_pkg;
 
   typedef struct packed {
     logic [31:0] q;
-  } sysctrl_reg2hw_chipid_reg_t;
+  } sysctrl_reg2hw_tohost_reg_t;
 
   typedef struct packed {
-    logic [31:0] q;
-  } sysctrl_reg2hw_spare_reg_t;
+    logic [31:0] d;
+    logic        de;
+  } sysctrl_hw2reg_chipid_reg_t;
 
   typedef struct packed {
-    struct packed {
-      logic [15:0] q;
-    } reg00;
-    struct packed {
-      logic [15:0] q;
-    } reg01;
-  } sysctrl_reg2hw_reg_1_reg_t;
+    logic [31:0] d;
+    logic        de;
+  } sysctrl_hw2reg_fromhost_reg_t;
 
   // Register -> HW type
   typedef struct packed {
-    sysctrl_reg2hw_chipid_reg_t chipid; // [95:64]
-    sysctrl_reg2hw_spare_reg_t spare; // [63:32]
-    sysctrl_reg2hw_reg_1_reg_t reg_1; // [31:0]
+    sysctrl_reg2hw_tohost_reg_t tohost; // [31:0]
   } sysctrl_reg2hw_t;
+
+  // HW -> register type
+  typedef struct packed {
+    sysctrl_hw2reg_chipid_reg_t chipid; // [65:33]
+    sysctrl_hw2reg_fromhost_reg_t fromhost; // [32:0]
+  } sysctrl_hw2reg_t;
 
   // Register offsets
   parameter logic [BlockAw-1:0] SYSCTRL_CHIPID_OFFSET = 4'h 0;
-  parameter logic [BlockAw-1:0] SYSCTRL_SPARE_OFFSET = 4'h 4;
-  parameter logic [BlockAw-1:0] SYSCTRL_REG_1_OFFSET = 4'h 8;
+  parameter logic [BlockAw-1:0] SYSCTRL_TOHOST_OFFSET = 4'h 4;
+  parameter logic [BlockAw-1:0] SYSCTRL_FROMHOST_OFFSET = 4'h 8;
 
   // Register index
   typedef enum int {
     SYSCTRL_CHIPID,
-    SYSCTRL_SPARE,
-    SYSCTRL_REG_1
+    SYSCTRL_TOHOST,
+    SYSCTRL_FROMHOST
   } sysctrl_id_e;
 
   // Register width information to check illegal writes
   parameter logic [3:0] SYSCTRL_PERMIT [3] = '{
     4'b 1111, // index[0] SYSCTRL_CHIPID
-    4'b 1111, // index[1] SYSCTRL_SPARE
-    4'b 1111  // index[2] SYSCTRL_REG_1
+    4'b 1111, // index[1] SYSCTRL_TOHOST
+    4'b 1111  // index[2] SYSCTRL_FROMHOST
   };
 
 endpackage

@@ -14,6 +14,7 @@
       "name": "CHIPID",
       "desc": "Chip Identification register",
       "swaccess": "ro",
+      "hwaccess": "hwo",
       "resval": "0",
       "fields": [
         {
@@ -24,36 +25,30 @@
       ]
     },
     {
-      "name": "SPARE",
-      "desc": "spare register for debug",
-      "swaccess": "rw",
+      "name": "TOHOST",
+      "desc": "to host register for comm with testbench",
+      "swaccess": "wo",
+      "hwaccess": "hro",
       "resval": "0",
       "fields": [
         {
           "bits": "31:0",
-          "name": "SPARE",
-          "desc": "",
-          "swaccess": "rw"
+          "name": "TOHOST",
+          "desc": "TO HOST register for comm with testbench"
         }
       ]
     },
     {
-      "name": "REG_1",
-      "desc": "register 1",
-      "swaccess": "rw",
+      "name": "FROMHOST",
+      "desc": "",
+      "swaccess": "ro",
+      "hwaccess": "hwo",
       "resval": "0",
       "fields": [
         {
-          "bits": "15:0",
-          "name": "reg00",
-          "desc": "",
-          "swaccess": "rw"
-        },
-        {
-          "bits": "31:16",
-          "name": "reg01",
-          "desc": "reg01",
-          "swaccess": "rw"
+          "bits": "31:0",
+          "name": "FROMHOST",
+          "desc": "FROM HOST register for comm with testbench"
         }
       ]
     }

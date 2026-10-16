@@ -3,3 +3,6 @@ firmware/build
 
 # Generated simulation memory
 verif/tb/sram_program.mem
+
+# Selected testbench scenario
+verif/tb/selected_test.svh

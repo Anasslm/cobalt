@@ -47,6 +47,11 @@ module cobalt_tb;
 
 `include "selected_test.svh"
 
+initial begin
+    $dumpfile("cobalt.fst");
+    $dumpvars(0, cobalt_tb);
+end
+
 initial uart_rx = 1'b1; // UART idle level
 
 initial begin

@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 
+import html
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
 import hjson
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QDialog, QFileDialog,
     QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter, QTreeWidget,
     QTreeWidgetItem, QLabel, QPushButton, QLineEdit, QComboBox,
     QSpinBox, QTextEdit, QMessageBox, QGroupBox, QTableWidget,
-    QTableWidgetItem, QHeaderView, QMenu
+    QTableWidgetItem, QHeaderView, QMenu, QInputDialog
 )
 
 
 def text_value(value, default=""):
     return str(value) if value is not None else default
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+REGTOOL = SCRIPT_DIR / "reggen" / "regtool.py"
 
 
 class CreateBlockDialog(QDialog):
@@ -90,16 +99,26 @@ class RegisterDialog(QDialog):
         self.name = QLineEdit(text_value(register.get("name")))
         self.desc = QLineEdit(text_value(register.get("desc")))
         self.swaccess = QComboBox()
-        self.swaccess.addItems(["rw", "ro", "wo", "rw1c", "rw1s"])
+        self.swaccess.addItems([
+            "none", "ro", "rc", "rw", "r0w1c",
+            "rw1s", "rw1c", "rw0c", "wo",
+        ])
         current_access = text_value(register.get("swaccess"), "rw")
         if self.swaccess.findText(current_access) < 0:
             self.swaccess.addItem(current_access)
         self.swaccess.setCurrentText(current_access)
+        self.hwaccess = QComboBox()
+        self.hwaccess.addItems(["hro", "hrw", "hwo", "none"])
+        current_hwaccess = text_value(register.get("hwaccess"), "hro")
+        if self.hwaccess.findText(current_hwaccess) < 0:
+            self.hwaccess.addItem(current_hwaccess)
+        self.hwaccess.setCurrentText(current_hwaccess)
         self.resval = QLineEdit(text_value(register.get("resval"), "0"))
 
         form.addRow("Register name:", self.name)
         form.addRow("Description:", self.desc)
         form.addRow("Software access:", self.swaccess)
+        form.addRow("Hardware access:", self.hwaccess)
         form.addRow("Reset value:", self.resval)
         layout.addLayout(form)
 
@@ -118,6 +137,7 @@ class RegisterDialog(QDialog):
             "name": self.name.text().strip(),
             "desc": self.desc.text().strip(),
             "swaccess": self.swaccess.currentText(),
+            "hwaccess": self.hwaccess.currentText(),
             "resval": self.resval.text().strip(),
         }
 
@@ -135,18 +155,10 @@ class FieldDialog(QDialog):
         self.name = QLineEdit(text_value(field.get("name")))
         self.bits = QLineEdit(text_value(field.get("bits"), "31:0"))
         self.desc = QLineEdit(text_value(field.get("desc")))
-        self.swaccess = QComboBox()
-        self.swaccess.addItems(["rw", "ro", "wo", "rw1c", "rw1s"])
-        current_access = text_value(field.get("swaccess"), "")
-        if current_access:
-            if self.swaccess.findText(current_access) < 0:
-                self.swaccess.addItem(current_access)
-            self.swaccess.setCurrentText(current_access)
 
         form.addRow("Field name:", self.name)
         form.addRow("Bits (e.g. 7:0):", self.bits)
         form.addRow("Description:", self.desc)
-        form.addRow("Software access (optional):", self.swaccess)
         layout.addLayout(form)
 
         buttons = QHBoxLayout()
@@ -160,14 +172,11 @@ class FieldDialog(QDialog):
         layout.addLayout(buttons)
 
     def get_data(self):
-        result = {
+        return {
             "bits": self.bits.text().strip(),
             "name": self.name.text().strip(),
             "desc": self.desc.text().strip(),
         }
-        if self.swaccess.currentText():
-            result["swaccess"] = self.swaccess.currentText()
-        return result
 
 
 class RegGenWindow(QMainWindow):
@@ -270,6 +279,16 @@ class RegGenWindow(QMainWindow):
         export_doc_action = self.export_menu.addAction("Export DOC")
         export_ral_action = self.export_menu.addAction("Export RAL")
 
+
+        self.export_actions = [
+            export_rtl_action,
+            export_doc_action,
+            export_ral_action,
+        ]
+
+        for action in self.export_actions:
+            action.setEnabled(False)
+
         export_rtl_action.triggered.connect(
             lambda: self.export_block("RTL")
         )
@@ -348,13 +367,14 @@ class RegGenWindow(QMainWindow):
         right_layout.addWidget(QLabel("REGISTER MAP"))
         
         self.register_table = QTableWidget()
-        self.register_table.setColumnCount(7)
+        self.register_table.setColumnCount(8)
         self.register_table.setHorizontalHeaderLabels([
             "Register",
             "Field",
             "Bits",
             "Occupied",
-            "SW Access",
+            "Register SW",
+            "Register HW",
             "Reset",
             "Description",
         ])
@@ -431,8 +451,13 @@ class RegGenWindow(QMainWindow):
         ]:
             widget.setEnabled(enabled)
 
-    def log_message(self, message):
-        self.log.append(message)
+    def log_message(self, message, color=None):
+        if color:
+            self.log.append(
+                f'<span style="color: {color};">{message}</span>'
+            )
+        else:
+            self.log.append(message)
 
     def confirm_discard(self):
         if not self.dirty:
@@ -534,6 +559,11 @@ class RegGenWindow(QMainWindow):
                 if not isinstance(register, dict):
                     raise ValueError("Every register must be an object.")
                 register.setdefault("fields", [])
+                for field in register["fields"]:
+                    if not isinstance(field, dict):
+                        raise ValueError("Every field must be an object.")
+                    field.pop("swaccess", None)
+                    field.pop("hwaccess", None)
 
             self.data = loaded
             self.current_file = Path(filename)
@@ -582,6 +612,8 @@ class RegGenWindow(QMainWindow):
         self.mark_dirty()
 
     def mark_dirty(self):
+        for action in getattr(self, "export_actions", []):
+            action.setEnabled(False)        
         self.dirty = True
         self.update_preview()
         if self.current_file:
@@ -617,7 +649,8 @@ class RegGenWindow(QMainWindow):
                     "(no fields)",
                     "—",
                     "0",
-                    register.get("swaccess", ""),
+                    register.get("swaccess", "") if field_index == 0 else "",
+                    register.get("hwaccess", "") if field_index == 0 else "",
                     register.get("resval", ""),
                     register.get("desc", ""),
                 ]
@@ -632,10 +665,8 @@ class RegGenWindow(QMainWindow):
                     field.get("name", ""),
                     bit_range,
                     str(occupied) if occupied is not None else "Invalid",
-                    field.get(
-                        "swaccess",
-                        register.get("swaccess", "")
-                    ),
+                    register.get("swaccess", ""),
+                    register.get("hwaccess", ""),
                     register.get("resval", ""),
                     field.get("desc", ""),
                 ]
@@ -835,28 +866,556 @@ class RegGenWindow(QMainWindow):
         self.log_message(f"Removed: {description}")
     def check_block(self):
         if not self.data:
-            self.log_message("CHECK: No register block loaded.")
+            self.log_message("CHECK FAILED: No register block loaded.", color="red")
             return
+
+        if not self.current_file:
+            self.log_message("CHECK FAILED: No HJSON file is associated with this block.", color="red")
+            return
+
+        # Save the current GUI contents before checking the file.
+        if not self.save_hjson():
+            self.log_message("CHECK FAILED: Could not save the current HJSON.", color="red")
+            return
+
+        hjson_file = self.current_file.resolve()
+
+        # Resolve paths relative to registrator.py, regardless of the launch directory.
+        repo_root = REPO_ROOT
+        regtool = REGTOOL
+
+        # Invalidate any previous successful check.
+        for action in self.export_actions:
+            action.setEnabled(False)
+
+        if not regtool.is_file():
+            self.log_message(f"CHECK FAILED: regtool.py not found: {regtool}", color="red")
+            return
+
+        command = [
+            sys.executable,
+            str(regtool),
+            "-v",
+            str(hjson_file),
+        ]
+
+        self.log_message("")
+        self.log_message("========== CHECK STARTED ==========")
+        self.log_message(f"File: {hjson_file}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+            # regtool's verbose output, including the printed HJSON.
+            if result.stdout.strip():
+                self.log_message(result.stdout.rstrip())
+
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+            #    self.log_message(
+            #        f"CHECK FAILED: regtool.py exited with code "
+            #        f"{result.returncode}."
+            #    )
+                self.log_message(
+                    f"CHECK FAILED: regtool.py exited with code "
+                    f"{result.returncode}.",
+                    color="red"
+                )
+                return
+
+            self.log_message(
+                "CHECK PASSED: HJSON validation succeeded.",
+                color="green"
+            )
+            for action in self.export_actions:
+                action.setEnabled(True)
+
+            self.statusBar().showMessage("Check passed — export enabled")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                f"CHECK FAILED: regtool.py timed out after 60 seconds.",
+                color="red"
+            )
+
+        except OSError as error:
+            self.log_message(f"CHECK FAILED: Could not execute regtool.py: {error}", color="red")
+
 
         self.log_message(
             f"CHECK: Requested validation for '{self.data.get('name', 'Unnamed')}'."
         )
-        self.log_message("CHECK: Command execution not implemented yet.")
 
     def export_block(self, export_type):
         if not self.data:
             self.log_message(
-                f"EXPORT {export_type}: No register block loaded."
+                f"EXPORT {export_type} FAILED: No register block loaded.",
+                color="red",
             )
             return
 
-        self.log_message(
-            f"EXPORT {export_type}: Requested export for "
-            f"'{self.data.get('name', 'Unnamed')}'."
+        if export_type == "DOC":
+            self.export_doc()
+            return
+
+        if export_type != "RTL":
+            self.log_message(f"EXPORT {export_type}: Command execution not implemented yet.")
+            return
+
+        bus_type, accepted = QInputDialog.getItem(
+            self,
+            "Select RTL interface",
+            "Export interface:",
+            ["RegBus", "APB"],
+            0,
+            False,
         )
-        self.log_message(
-            f"EXPORT {export_type}: Command execution not implemented yet."
+        if not accepted:
+            return
+        if bus_type == "APB":
+            self.export_apb_rtl()
+            return
+
+        if not self.current_file or not self.current_file.is_file():
+            self.log_message(
+                "EXPORT RTL FAILED: No saved HJSON file is associated with this block.",
+                color="red",
+            )
+            return
+
+        if self.dirty:
+            self.log_message(
+                "EXPORT RTL FAILED: Save and check the HJSON before exporting.",
+                color="red",
+            )
+            return
+
+        output_directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select RTL output directory",
+            str(self.current_file.parent),
         )
+        if not output_directory:
+            return
+
+        repo_root = REPO_ROOT
+        regtool = REGTOOL
+        if not regtool.is_file():
+            self.log_message(
+                f"EXPORT RTL FAILED: regtool.py not found: {regtool}",
+                color="red",
+            )
+            return
+
+        output_path = Path(output_directory).resolve()
+        command = [
+            sys.executable,
+            str(regtool),
+            "-r",
+            "-t",
+            str(output_path),
+            str(self.current_file.resolve()),
+        ]
+
+        self.log_message("========== RTL EXPORT STARTED ==========")
+        self.log_message(f"HJSON: {self.current_file.resolve()}")
+        self.log_message(f"Output directory: {output_path}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+            if result.stdout.strip():
+                self.log_message(result.stdout.rstrip())
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+                self.log_message(
+                    f"EXPORT RTL FAILED: regtool.py exited with code {result.returncode}.",
+                    color="red",
+                )
+                return
+
+            self.log_message(
+                f"EXPORT SUCCESSFUL: RTL saved to {html.escape(str(output_path))}",
+                color="green",
+            )
+            self.statusBar().showMessage(f"RTL export successful: {output_path}")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                "EXPORT RTL FAILED: regtool.py timed out after 60 seconds.",
+                color="red",
+            )
+        except OSError as error:
+            self.log_message(
+                f"EXPORT RTL FAILED: Could not execute regtool.py: {error}",
+                color="red",
+            )
+
+    def export_apb_rtl(self):
+        if not self.current_file or not self.current_file.is_file():
+            self.log_message(
+                "EXPORT RTL FAILED: No saved HJSON file is associated with this block.",
+                color="red",
+            )
+            return
+
+        if self.dirty:
+            self.log_message(
+                "EXPORT RTL FAILED: Save and check the HJSON before exporting.",
+                color="red",
+            )
+            return
+
+        output_directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select APB RTL output directory",
+            str(self.current_file.parent),
+        )
+        if not output_directory:
+            return
+
+        repo_root = REPO_ROOT
+        regtool = REGTOOL
+        if not regtool.is_file():
+            self.log_message(
+                f"EXPORT RTL FAILED: regtool.py not found: {regtool}",
+                color="red",
+            )
+            return
+
+        output_path = Path(output_directory).resolve()
+        hjson_path = self.current_file.resolve()
+        command = [
+            sys.executable,
+            str(regtool),
+            "-r",
+            "-t",
+            str(output_path),
+            str(hjson_path),
+        ]
+
+        self.log_message("========== APB RTL EXPORT STARTED ==========")
+        self.log_message(f"HJSON: {hjson_path}")
+        self.log_message(f"Output directory: {output_path}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+            if result.stdout.strip():
+                self.log_message(result.stdout.rstrip())
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+                self.log_message(
+                    f"EXPORT RTL FAILED: regtool.py exited with code {result.returncode}.",
+                    color="red",
+                )
+                return
+
+            module_name = str(self.data["name"]).lower()
+            wrapper_path = output_path / f"{module_name}_reg_top_apb.sv"
+            generated_pkg = output_path / f"{module_name}_reg_pkg.sv"
+            wrapper_path.write_text(
+                self.make_apb_wrapper(
+                    self.data,
+                    generated_pkg.read_text(encoding="utf-8"),
+                ),
+                encoding="utf-8",
+            )
+            self.log_message(
+                f"EXPORT SUCCESSFUL: APB RTL saved to "
+                f"{html.escape(str(output_path))}",
+                color="green",
+            )
+            self.log_message(f"APB wrapper: {html.escape(str(wrapper_path))}")
+            self.statusBar().showMessage(f"APB RTL export successful: {output_path}")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                "EXPORT RTL FAILED: regtool.py timed out after 60 seconds.",
+                color="red",
+            )
+        except OSError as error:
+            self.log_message(
+                f"EXPORT RTL FAILED: Could not generate APB RTL: {error}",
+                color="red",
+            )
+        except ValueError as error:
+            self.log_message(
+                f"EXPORT RTL FAILED: Could not build APB hardware ports: {error}",
+                color="red",
+            )
+
+    @staticmethod
+    def make_apb_wrapper(block_data, generated_pkg):
+        block_name = str(block_data["name"])
+        module_name = block_name.lower()
+        reg_width = int(block_data.get("regwidth", 32))
+        strb_width = reg_width // 8
+        structs = {
+            match.group(2): match.group(1)
+            for match in re.finditer(
+                r"typedef\s+struct\s+packed\s*\{([^}]*)\}\s*(\w+)\s*;",
+                generated_pkg,
+                re.DOTALL,
+            )
+        }
+
+        hw_ports = []
+        hw_declarations = []
+        hw_assignments = []
+        hw_connections = []
+        for direction, struct_suffix in (
+            ("output", "reg2hw"),
+            ("input", "hw2reg"),
+        ):
+            struct_name = f"{module_name}_{struct_suffix}_t"
+            struct_body = structs.get(struct_name)
+            if struct_body is None:
+                continue
+
+            hw_declarations.append(
+                f"  {module_name}_reg_pkg::{struct_name} {struct_suffix};"
+            )
+            for leaf_type, field_name in re.findall(
+                r"^\s*(\w+)\s+(\w+)\s*;",
+                struct_body,
+                re.MULTILINE,
+            ):
+                leaf_body = structs.get(leaf_type)
+                if leaf_body is None:
+                    raise ValueError(
+                        f"Missing generated type definition: {leaf_type}"
+                    )
+                leaf_members = re.findall(
+                    r"^\s*(logic(?:\s*\[[^\]]+\])?)\s+(\w+)\s*;",
+                    leaf_body,
+                    re.MULTILINE,
+                )
+                for signal_type, signal_name in leaf_members:
+                    port_name = f"{field_name}_{signal_name}"
+                    if direction == "input" and port_name.endswith("_de"):
+                        hw_assignments.append(
+                            f"  assign {struct_suffix}.{field_name}.{signal_name} = 1'b1;"
+                        )
+                        continue
+
+                    hw_ports.append((direction, signal_type, port_name))
+                    if direction == "output":
+                        hw_assignments.append(
+                            f"  assign {port_name} = "
+                            f"{struct_suffix}.{field_name}.{signal_name};"
+                        )
+                    else:
+                        hw_assignments.append(
+                            f"  assign {struct_suffix}.{field_name}.{signal_name} "
+                            f"= {port_name};"
+                        )
+            hw_connections.append(f"    .{struct_suffix}({struct_suffix}),")
+
+        port_entries = [
+            ("input", "logic", "clk_i"),
+            ("input", "logic", "rst_ni"),
+            ("input", "logic", "PSEL"),
+            ("input", "logic", "PENABLE"),
+            ("input", "logic", "PWRITE"),
+            ("input", "logic [31:0]", "PADDR"),
+            ("input", f"logic [{reg_width - 1}:0]", "PWDATA"),
+            ("input", f"logic [{strb_width - 1}:0]", "PSTRB"),
+            ("output", f"logic [{reg_width - 1}:0]", "PRDATA"),
+            ("output", "logic", "PREADY"),
+            ("output", "logic", "PSLVERR"),
+            *hw_ports,
+            ("input", "logic", "devmode_i"),
+        ]
+        type_width = max(len(signal_type) for _, signal_type, _ in port_entries)
+        ports = ",\n".join(
+            f"  {direction:<6} {signal_type:<{type_width}} {port_name}"
+            for direction, signal_type, port_name in port_entries
+        )
+        declarations = "\n".join(hw_declarations)
+        assignments = "\n".join(hw_assignments)
+        connections = "\n".join(hw_connections)
+
+        return f"""// APB wrapper for {block_name} register RTL.
+`include "register_interface/typedef.svh"
+
+module {module_name}_reg_top_apb #(
+  parameter int AW = {module_name}_reg_pkg::BlockAw
+) (
+{ports}
+);
+
+  `REG_BUS_TYPEDEF_ALL({module_name}, logic [AW-1:0], logic [{reg_width - 1}:0], logic [{strb_width - 1}:0])
+
+  {module_name}_req_t reg_req;
+  {module_name}_rsp_t reg_rsp;
+{declarations}
+
+  always_comb begin
+    reg_req.addr = PADDR[AW-1:0];
+    reg_req.write = PWRITE;
+    reg_req.wdata = PWDATA;
+    reg_req.wstrb = PSTRB;
+    reg_req.valid = PSEL & PENABLE;
+
+    PRDATA = reg_rsp.rdata;
+    PREADY = reg_rsp.ready;
+    PSLVERR = reg_rsp.error;
+  end
+
+{assignments}
+
+  {module_name}_reg_top #(
+    .reg_req_t({module_name}_req_t),
+    .reg_rsp_t({module_name}_rsp_t),
+    .AW(AW)
+  ) i_regs (
+    .clk_i,
+    .rst_ni,
+    .reg_req_i(reg_req),
+    .reg_rsp_o(reg_rsp),
+{connections}
+    .devmode_i
+  );
+
+endmodule
+"""
+
+    def export_doc(self):
+        if not self.current_file or not self.current_file.is_file():
+            self.log_message(
+                "EXPORT DOC FAILED: No saved HJSON file is associated with this block.",
+                color="red",
+            )
+            return
+
+        if self.dirty:
+            self.log_message(
+                "EXPORT DOC FAILED: Save and check the HJSON before exporting.",
+                color="red",
+            )
+            return
+
+        default_name = text_value(
+            self.data.get("name"), self.current_file.stem
+        ).strip() or self.current_file.stem
+        suggested_path = self.current_file.parent / f"{default_name}.html"
+        output_filename, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save register documentation",
+            str(suggested_path),
+            "HTML files (*.html);;Markdown files (*.md)",
+        )
+        if not output_filename:
+            return
+        is_markdown = selected_filter.startswith("Markdown")
+        extension = ".md" if is_markdown else ".html"
+
+        repo_root = REPO_ROOT
+        regtool = REGTOOL
+        if not regtool.is_file():
+            self.log_message(
+                f"EXPORT DOC FAILED: regtool.py not found: {regtool}",
+                color="red",
+            )
+            return
+
+        output_path = Path(output_filename).expanduser().resolve()
+        output_path = output_path.with_suffix(extension)
+        command = [
+            sys.executable,
+            str(regtool),
+            "-d",
+            str(self.current_file.resolve()),
+        ]
+
+        self.log_message("========== DOC EXPORT STARTED ==========")
+        self.log_message(f"HJSON: {self.current_file.resolve()}")
+        self.log_message(f"Output file: {output_path}")
+        self.log_message(f"Command: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=60,
+                check=False,
+            )
+
+            if result.stderr.strip():
+                self.log_message(result.stderr.rstrip())
+
+            if result.returncode != 0:
+                self.log_message(
+                    f"EXPORT DOC FAILED: regtool.py exited with code {result.returncode}.",
+                    color="red",
+                )
+                return
+
+            if is_markdown:
+                document = QTextDocument()
+                document.setHtml(result.stdout)
+                output_content = document.toMarkdown()
+            else:
+                output_content = result.stdout
+
+            if not output_content.strip():
+                self.log_message(
+                    "EXPORT DOC FAILED: regtool.py produced empty documentation.",
+                    color="red",
+                )
+                return
+
+            output_path.write_text(output_content, encoding="utf-8")
+            self.log_message(
+                f"EXPORT SUCCESSFUL: DOC saved to {html.escape(str(output_path))}",
+                color="green",
+            )
+            self.statusBar().showMessage(f"DOC export successful: {output_path}")
+
+        except subprocess.TimeoutExpired:
+            self.log_message(
+                "EXPORT DOC FAILED: regtool.py timed out after 60 seconds.",
+                color="red",
+            )
+        except OSError as error:
+            self.log_message(
+                f"EXPORT DOC FAILED: Could not generate/write documentation: {error}",
+                color="red",
+            )
 
     def save_hjson(self):
         if not self.data:
@@ -874,6 +1433,11 @@ class RegGenWindow(QMainWindow):
         self.metadata_changed()
 
         try:
+            for register in self.data.get("registers", []):
+                for field in register.get("fields", []):
+                    field.pop("swaccess", None)
+                    field.pop("hwaccess", None)
+
             self.current_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.current_file, "w", encoding="utf-8") as stream:
                 # JSON is valid HJSON, and preserves string-valued fields.
