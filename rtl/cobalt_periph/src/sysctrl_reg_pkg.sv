@@ -15,22 +15,28 @@ package sysctrl_reg_pkg;
 
   typedef struct packed {
     logic [31:0] q;
-  } sysctrl_reg2hw_chipid_reg_t;
-
-  typedef struct packed {
-    logic [31:0] q;
   } sysctrl_reg2hw_tohost_reg_t;
 
   typedef struct packed {
-    logic [31:0] q;
-  } sysctrl_reg2hw_fromhost_reg_t;
+    logic [31:0] d;
+    logic        de;
+  } sysctrl_hw2reg_chipid_reg_t;
+
+  typedef struct packed {
+    logic [31:0] d;
+    logic        de;
+  } sysctrl_hw2reg_fromhost_reg_t;
 
   // Register -> HW type
   typedef struct packed {
-    sysctrl_reg2hw_chipid_reg_t chipid; // [95:64]
-    sysctrl_reg2hw_tohost_reg_t tohost; // [63:32]
-    sysctrl_reg2hw_fromhost_reg_t fromhost; // [31:0]
+    sysctrl_reg2hw_tohost_reg_t tohost; // [31:0]
   } sysctrl_reg2hw_t;
+
+  // HW -> register type
+  typedef struct packed {
+    sysctrl_hw2reg_chipid_reg_t chipid; // [65:33]
+    sysctrl_hw2reg_fromhost_reg_t fromhost; // [32:0]
+  } sysctrl_hw2reg_t;
 
   // Register offsets
   parameter logic [BlockAw-1:0] SYSCTRL_CHIPID_OFFSET = 4'h 0;

@@ -18,6 +18,7 @@ module sysctrl_reg_top #(
   output reg_rsp_t reg_rsp_o,
   // To HW
   output sysctrl_reg_pkg::sysctrl_reg2hw_t reg2hw, // Write
+  input  sysctrl_reg_pkg::sysctrl_hw2reg_t hw2reg, // Read
 
 
   // Config
@@ -87,12 +88,12 @@ module sysctrl_reg_top #(
     .wd     ('0  ),
 
     // from internal hardware
-    .de     (1'b0),
-    .d      ('0  ),
+    .de     (hw2reg.chipid.de),
+    .d      (hw2reg.chipid.d ),
 
     // to internal hardware
     .qe     (),
-    .q      (reg2hw.chipid.q ),
+    .q      (),
 
     // to register interface (read)
     .qs     (chipid_qs)
@@ -139,12 +140,12 @@ module sysctrl_reg_top #(
     .wd     ('0  ),
 
     // from internal hardware
-    .de     (1'b0),
-    .d      ('0  ),
+    .de     (hw2reg.fromhost.de),
+    .d      (hw2reg.fromhost.d ),
 
     // to internal hardware
     .qe     (),
-    .q      (reg2hw.fromhost.q ),
+    .q      (),
 
     // to register interface (read)
     .qs     (fromhost_qs)
@@ -220,6 +221,7 @@ module sysctrl_reg_top_intf
   REG_BUS.in  regbus_slave,
   // To HW
   output sysctrl_reg_pkg::sysctrl_reg2hw_t reg2hw, // Write
+  input  sysctrl_reg_pkg::sysctrl_hw2reg_t hw2reg, // Read
   // Config
   input devmode_i // If 1, explicit error return for unmapped register access
 );
@@ -253,6 +255,7 @@ module sysctrl_reg_top_intf
     .reg_req_i(s_reg_req),
     .reg_rsp_o(s_reg_rsp),
     .reg2hw, // Write
+    .hw2reg, // Read
     .devmode_i
   );
   

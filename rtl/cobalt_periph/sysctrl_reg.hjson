@@ -14,6 +14,7 @@
       "name": "CHIPID",
       "desc": "Chip Identification register",
       "swaccess": "ro",
+      "hwaccess": "hwo",
       "resval": "0",
       "fields": [
         {
@@ -27,13 +28,13 @@
       "name": "TOHOST",
       "desc": "to host register for comm with testbench",
       "swaccess": "wo",
+      "hwaccess": "hro",
       "resval": "0",
       "fields": [
         {
           "bits": "31:0",
           "name": "TOHOST",
-          "desc": "TO HOST register for comm with testbench",
-          "swaccess": "wo"
+          "desc": "TO HOST register for comm with testbench"
         }
       ]
     },
@@ -41,13 +42,13 @@
       "name": "FROMHOST",
       "desc": "",
       "swaccess": "ro",
+      "hwaccess": "hwo",
       "resval": "0",
       "fields": [
         {
           "bits": "31:0",
           "name": "FROMHOST",
-          "desc": "FROM HOST register for comm with testbench",
-          "swaccess": "ro"
+          "desc": "FROM HOST register for comm with testbench"
         }
       ]
     }

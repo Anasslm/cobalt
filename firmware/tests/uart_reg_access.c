@@ -51,6 +51,15 @@ int main(void)
     
 
     cobalt_printf("UART register access test PASSED\n");
+
+    volatile uint64_t *sysctrl_chipid = (volatile uint64_t *)0x04000000;
+    volatile uint64_t *sysctrl_tohost = (volatile uint64_t *)0x04000004;
+    volatile uint64_t *sysctrl_fromhost = (volatile uint64_t *)0x04000008;
+
+    cobalt_printf("sysctrl_chipid : %x\n", *sysctrl_chipid);
+    cobalt_printf("sysctrl_tohost : %x\n", *sysctrl_tohost);
+    cobalt_printf("sysctrl_fromhost : %x\n", *sysctrl_fromhost);
+
     cobalt_exit(0);
     return 0;
 

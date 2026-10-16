@@ -266,6 +266,10 @@ firmware/boot/cobalt_boot.sv
 #rtl/third_party/axi_slice/src/axi_w_buffer.sv
 #rtl/third_party/axi2apb/src/axi2apb_64_32.sv
 
+//REGBUS
+-Irtl/third_party/cva6/corev_apu/register_interface/include/
+rtl/third_party/cva6/corev_apu/rv_plic/rtl/prim_subreg.sv
+
 //APB
 -Irtl/third_party/apb/include/
 
@@ -273,6 +277,12 @@ firmware/boot/cobalt_boot.sv
 -Irtl/third_party/apb_uart/include/
 
 rtl/third_party/apb/src/apb_pkg.sv
+rtl/third_party/apb/src/apb_cdc.sv
+rtl/third_party/apb/src/apb_demux.sv
+rtl/third_party/apb/src/apb_err_slv.sv
+rtl/third_party/apb/src/apb_intf.sv
+rtl/third_party/apb/src/apb_regs.sv
+
 rtl/third_party/apb_uart/src/apb_uart_wrap.sv
 rtl/third_party/apb_uart/src/apb_uart.sv
 rtl/third_party/apb_uart/src/reg_uart_wrap.sv
@@ -290,9 +300,18 @@ rtl/third_party/apb_uart/src/uart_transmitter.sv
 
 -F rtl/third_party/cva6/core/Flist.cva6
 
+
+
 #${CVA6_REPO_DIR}/corev_apu/tb/axi_intf.sv
 rtl/cpu_subsys/cpu_subsys_pkg.sv
 rtl/cpu_subsys/cobalt_axi_pkg.sv
 rtl/cobalt_soc/cobalt_pkg.sv
+
+
+rtl/cobalt_periph/src/sysctrl_reg_pkg.sv
+rtl/cobalt_periph/src/sysctrl_reg_top_apb.sv
+rtl/cobalt_periph/src/sysctrl_reg_top.sv
+
+rtl/cobalt_periph/src/periph_subsys.sv
 rtl/cpu_subsys/cpu_subsys.sv
 rtl/cobalt_soc/cobalt_soc.sv
