@@ -307,6 +307,10 @@ rtl/cpu_subsys/cpu_subsys_pkg.sv
 rtl/cpu_subsys/cobalt_axi_pkg.sv
 rtl/cobalt_soc/cobalt_pkg.sv
 
+rtl/cobalt_periph/src/periph_subsys.sv
+rtl/third_party/clint/src/clint_reg_pkg.sv
+rtl/third_party/clint/src/clint_reg.sv
+rtl/third_party/clint/src/clint.sv
 
 rtl/cobalt_periph/src/sysctrl_reg_pkg.sv
 rtl/cobalt_periph/src/sysctrl_reg_top_apb.sv
