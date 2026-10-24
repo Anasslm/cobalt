@@ -5,6 +5,7 @@ module periph_subsys #(
 )
 (
     input clk_i,
+    input rtc_clk_i,
     input rst_ni,
 
     // AXI Slave Interface
@@ -13,7 +14,10 @@ module periph_subsys #(
 
     // UART
     input  logic  rx_i,
-    output logic  tx_o
+    output logic  tx_o,
+
+    // IRQs
+    output logic timer_irq_o
 );
 
 `include "axi/typedef.svh"
@@ -110,6 +114,21 @@ apb_demux # (
   );
 
 
+  clint #(
+    .apb_req_t(apb_req_t ),
+    .apb_rsp_t(apb_resp_t)
+  ) i_clint (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+    .testmode_i(0),
+    .apb_req_i(apb_demux_req[cobalt_pkg::CLINT]),
+    .apb_rsp_o(apb_demux_rsp[cobalt_pkg::CLINT]),
+    .rtc_i(rtc_clk_i),
+    .timer_irq_o(timer_irq_o),
+    .ipi_o()
+  );
+
+
   // UART
   apb_uart i_apb_uart (
     .CLK     ( clk_i           ),
@@ -135,22 +154,7 @@ apb_demux # (
     .SOUT    ( tx_o            )
 );
 
-// define reg type according to REG_BUS
-`REG_BUS_TYPEDEF_ALL(sysctrl, logic[31:0], logic[31:0], logic[3:0])
-sysctrl_req_t sysctrl_req;
-sysctrl_rsp_t sysctrl_rsp;
 
-// This is basically an APB to REG bcomb bridge
-  always_comb begin
-    sysctrl_req.addr = apb_demux_req[cobalt_pkg::SYSCTRL].paddr;
-    sysctrl_req.write = apb_demux_req[cobalt_pkg::SYSCTRL].pwrite;
-    sysctrl_req.wdata = apb_demux_req[cobalt_pkg::SYSCTRL].pwdata;
-    sysctrl_req.wstrb = '1;
-    sysctrl_req.valid = apb_demux_req[cobalt_pkg::SYSCTRL].psel & apb_demux_req[cobalt_pkg::SYSCTRL].penable;
-    apb_demux_rsp[cobalt_pkg::SYSCTRL].pready = sysctrl_rsp.ready;
-    apb_demux_rsp[cobalt_pkg::SYSCTRL].pslverr = sysctrl_rsp.error;
-    apb_demux_rsp[cobalt_pkg::SYSCTRL].prdata = sysctrl_rsp.rdata;
-  end
 
 
 sysctrl_reg_top_apb i_sysctrl_reg_top_apb (
@@ -170,38 +174,7 @@ sysctrl_reg_top_apb i_sysctrl_reg_top_apb (
     .fromhost_d(32'hC0BA_C0BA),
     .devmode_i(1'b1)
   );
-/*
-sysctrl_reg_pkg::sysctrl_reg2hw_t sysctrl_reg2hw;
-sysctrl_reg_pkg::sysctrl_hw2reg_t sysctrl_hw2reg;
 
-logic [31:0] tohost;
-
-
-assign sysctrl_hw2reg.chipid.d  = 32'hC0BA_1701;
-assign sysctrl_hw2reg.chipid.de  = 1'b1;
-assign tohost = sysctrl_reg2hw.tohost.q ;
-
-assign sysctrl_hw2reg.fromhost.d = 32'hC0BA_C0BA;
-assign sysctrl_hw2reg.fromhost.de  = 1'b1;
-assign sysctrl_hw2reg.chipid.de  = 1'b1;
-
-
-sysctrl_reg_top # (
-  .reg_req_t(sysctrl_req_t),
-  .reg_rsp_t(sysctrl_rsp_t)
-
-)
-sysctrl_reg_top_inst (
-  .clk_i(clk_i),
-  .rst_ni(rst_ni),
-  .reg_req_i(sysctrl_req),
-  .reg_rsp_o(sysctrl_rsp),
-  .reg2hw(sysctrl_reg2hw),
-  .hw2reg(sysctrl_hw2reg),
-  .devmode_i(1'b1)
-);
-
-*/
 
 
 endmodule
