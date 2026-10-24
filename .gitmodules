@@ -19,3 +19,7 @@
 [submodule "rtl/third_party/axi"]
 	path = rtl/third_party/axi
 	url = https://github.com/pulp-platform/axi.git
+[submodule "rtl/third_party/clint"]
+	path = rtl/third_party/clint
+	url = https://github.com/Anasslm/clint.git
+	branch = cobalt-one-core
