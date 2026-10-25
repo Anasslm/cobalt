@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 
 module cobalt_tb;
 
@@ -17,6 +18,8 @@ module cobalt_tb;
   parameter int unsigned  UartParityEna     = 0;
   parameter int unsigned  UartBurstBytes    = 256;
   parameter int unsigned  UartWaitCycles    = 60;
+  // RTC clock: 32.768 kHz
+  localparam realtime RTC_CLK_PERIOD_NS = 1_000_000.0 / 32.768;
 
   // UART VIP tasks and monitor
   `include "uart_vip.svh"
@@ -31,6 +34,7 @@ module cobalt_tb;
 
   //Ports
   reg clk_i;
+  reg rtc_clk;
   reg rst_ni;
 
   logic uart_tx;
@@ -40,6 +44,7 @@ module cobalt_tb;
 
   cobalt_soc  i_cobalt_soc (
     .clk_i(clk_i),
+    .rtc_clk_i(rtc_clk),
     .rst_ni(rst_ni),
     .tx_o(uart_tx),
     .rx_i(uart_rx)
@@ -53,6 +58,11 @@ initial begin
 end
 
 initial uart_rx = 1'b1; // UART idle level
+
+initial begin
+    forever #(RTC_CLK_PERIOD_NS / 2.0)
+        rtc_clk = ~rtc_clk;
+end
 
 initial begin
     $display("COBALT TB");

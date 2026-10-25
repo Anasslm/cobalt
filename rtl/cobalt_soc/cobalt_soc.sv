@@ -4,6 +4,7 @@ module cobalt_soc #(
 )
 (
     input clk_i,
+    input rtc_clk_i,
     input rst_ni,
 
     input  logic  rx_i,
@@ -47,7 +48,7 @@ cpu_subsys  i_cpu_subsys (
     .boot_addr_i(cobalt_pkg::ROMBase),
     .hart_id_i(0),
     .irq_i(0),
-    .time_irq_i(0),
+    .time_irq_i(time_irq),
     .debug_req_i(0),
     .axi_req(xbar_slaves_req[0]),
     .axi_rsp(xbar_slaves_rsp[0])
@@ -239,11 +240,13 @@ periph_subsys #(
 )
 i_periph_subsys (
     .clk_i(clk_i),
+    .rtc_clk_i(rtc_clk_i),
     .rst_ni(rst_ni),
     .axi_req_i(xbar_masters_req[cobalt_pkg::PERIPH]),
     .axi_resp_o(xbar_masters_rsp[cobalt_pkg::PERIPH]),
     .rx_i(rx_i),
-    .tx_o(tx_o)
+    .tx_o(tx_o),
+    .timer_irq_o(time_irq)
   );
 
 
